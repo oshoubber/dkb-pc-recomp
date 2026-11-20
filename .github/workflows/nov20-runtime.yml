@@ -32,3 +32,9 @@ jobs:
           python tests/cfg_settings_test.py --cc clang
       - name: Exercise the native menu and preset choices
         run: python3 tools/ci/nov20-settings/native.py "$GITHUB_WORKSPACE"
+      - name: Exercise virtual controller handoffs with the production input code
+        run: |
+          vma=$(python -c 'import sys; sys.path.insert(0,"tools"); import build_game; print(build_game.vma_include())' | tail -1)
+          mkdir -p build
+          clang -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I runtime -I"$vma" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop
+          build/controller-coop
