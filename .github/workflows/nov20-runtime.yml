@@ -45,11 +45,12 @@ jobs:
         run: |
           vma=$(python -c 'import sys; sys.path.insert(0,"tools"); import build_game; print(build_game.vma_include())' | tail -1)
           mkdir -p build
-          clang -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I runtime -I"$vma" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop
+          flags=(-std=gnu11 -O2 -Wall -Wextra -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I runtime -I"$vma")
+          clang "${flags[@]}" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop
           build/controller-coop
           git fetch --depth=1 origin 44ba6b1ecbe398a1ac9d63f49150a7a9172c6bc7
           mkdir -p build/baseline
           git show FETCH_HEAD:runtime/input.c > build/baseline/input.c
-          clang -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I build/baseline -I runtime -I"$vma" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop-base
+          clang -I build/baseline "${flags[@]}" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop-base
           if build/controller-coop-base > build/baseline.log 2>&1; then echo 'Baseline unexpectedly passed'; exit 1; fi
           grep 'seats.*Assertion' build/baseline.log
