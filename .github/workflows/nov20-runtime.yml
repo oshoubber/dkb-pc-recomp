@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Vulkan headers and the release's SDL3 version
+        id: deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y libvulkan-dev
@@ -28,13 +29,27 @@ jobs:
         run: |
           vma=$(python -c 'import sys; sys.path.insert(0,"tools"); import build_game; print(build_game.vma_include())' | tail -1)
           clang -std=gnu11 -Iruntime -I"$vma" -fsyntax-only runtime/input.c runtime/cfg.c runtime/gfx_window_sdl.c runtime/ui_text.c
-          clang++ -std=c++20 -Iruntime -Iruntime/third_party/imgui -fsyntax-only runtime/ui/menu.cpp
+          # This source embeds the menu font. Ubuntu 24.04's default clang predates #embed.
+          cxx=
+          for candidate in clang++-22 clang++-21 clang++-20 clang++-19; do
+            if command -v "$candidate" >/dev/null; then cxx=$candidate; break; fi
+          done
+          if [ -z "$cxx" ]; then sudo apt-get install -y clang-19; cxx=clang++-19; fi
+          "$cxx" -std=c++20 -Iruntime -Iruntime/third_party/imgui -fsyntax-only runtime/ui/menu.cpp
           python tests/cfg_settings_test.py --cc clang
       - name: Exercise the native menu and preset choices
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: python3 tools/ci/nov20-settings/native.py "$GITHUB_WORKSPACE"
       - name: Exercise virtual controller handoffs with the production input code
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
           vma=$(python -c 'import sys; sys.path.insert(0,"tools"); import build_game; print(build_game.vma_include())' | tail -1)
           mkdir -p build
           clang -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I runtime -I"$vma" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop
           build/controller-coop
+          git fetch --depth=1 origin 44ba6b1ecbe398a1ac9d63f49150a7a9172c6bc7
+          mkdir -p build/baseline
+          git show FETCH_HEAD:runtime/input.c > build/baseline/input.c
+          clang -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-missing-field-initializers -ffunction-sections -fdata-sections -I build/baseline -I runtime -I"$vma" $(pkg-config --cflags sdl3) tools/ci/nov20-settings/controller_coop_whole_input_test.c runtime/input_map.c -Wl,--gc-sections $(pkg-config --libs sdl3) -lm -o build/controller-coop-base
+          if build/controller-coop-base > build/baseline.log 2>&1; then echo 'Baseline unexpectedly passed'; exit 1; fi
+          grep 'seats.*Assertion' build/baseline.log
