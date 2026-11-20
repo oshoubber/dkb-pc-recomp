@@ -6,7 +6,7 @@ name: Installer tests (Linux)
 
 on:
   push:
-    branches: [bananza, main]
+    branches: [bananza, main, ci/nov20-installer-compatibility]
   pull_request:
   workflow_dispatch:
 
