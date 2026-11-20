@@ -35,7 +35,7 @@ def main():
     input_file.write_text('redirected input\n', encoding='ascii')
     with (input_file.open() as stdin, output_file.open('w') as stdout, error_file.open('w') as stderr):
         subprocess.run([exe], stdin=stdin, stdout=stdout, stderr=stderr, startupinfo=startup,
-                       creationflags=subprocess.CREATE_NO_WINDOW, check=True, timeout=10)
+                       creationflags=subprocess.CREATE_NEW_CONSOLE, check=True, timeout=10)
     if (output_file.read_text(), error_file.read_text()) != ('redirected output\n', 'redirected error\n'):
         raise RuntimeError('redirected files did not receive the expected output')
     print('windows_console: private console detached and redirected streams preserved')
